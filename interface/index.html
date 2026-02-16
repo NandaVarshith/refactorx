@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="stylesheet" data-name="vs/editor/editor.main" href="https://cdnjs.cloudflare.com/ajax/libs/monaco-editor/0.44.0/min/vs/editor/editor.main.min.css">
+  <title>RefactorX – AI Code Review</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+
+<div class="workspace">
+
+  <!-- LEFT -->
+  <div class="assistant-panel">
+    <div class="assistant-header">RefactorX – AI Assistant</div>
+    <div class="assistant-content">
+      <div class="assistant-message">Welcome. Run a review to analyze your code.</div>
+    </div>
+    <div class="prompt-bar">
+      <textarea placeholder="Ask follow-up questions..."></textarea>
+      <button>Send</button>
+    </div>
+  </div>
+
+  <div class="splitter"></div>
+
+  <!-- RIGHT -->
+  <div class="editor-panel">
+
+    <div class="editor-tabs">
+      <div class="tabs-left">
+        <div class="tab">index.jsx</div>
+        <div class="tab active">sol.java</div>
+      </div>
+      <button class="copy-btn" id="copyBtn">Copy</button>
+    </div>
+
+    <div class="editor-actions">
+      <button class="action-btn primary" id="reviewBtn">Review</button>
+      <button class="action-btn" id="rewriteBtn">Rewrite</button>
+      <button class="action-btn" id="explainBtn">Explain</button>
+      <button class="action-btn" id="optimizeBtn">Optimize</button>
+    </div>
+
+    <div class="editor-area" id="editorArea">
+      <!-- Monaco Editor will be initialized here -->
+    </div>
+
+    <div class="review-dock" id="reviewDock">
+      <div class="review-header">
+        <span id="reviewHeaderText">Review</span>
+        <span id="qualityScoreText"></span>
+      </div>
+      <div class="review-summary">
+        <span id="reviewSummaryText">Run a review to see results.</span>
+      </div>
+      <div class="review-content" id="reviewContent">
+        <!-- Review cards will be dynamically inserted here -->
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <span>Java</span>
+      <span id="cursorInfo">Ln 1, Col 1</span>
+    </div>
+
+  </div>
+</div>
+
+<!-- Application Logic -->
+<script src="script.js"></script>
+
+</body>
+</html>
