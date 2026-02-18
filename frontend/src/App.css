@@ -74,8 +74,53 @@ body {
 }
 
 .assistant-message {
-  white-space: pre-wrap;
-  word-wrap: break-word;
+  line-height: 1.5;
+}
+
+.markdown-body {
+  color: var(--text-color);
+  word-break: break-word;
+}
+
+.markdown-body > :first-child {
+  margin-top: 0;
+}
+
+.markdown-body > :last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body p,
+.markdown-body ul,
+.markdown-body ol,
+.markdown-body pre,
+.markdown-body blockquote {
+  margin: 0 0 10px;
+}
+
+.markdown-body code {
+  font-family: 'Fira Code', 'Consolas', 'Courier New', Courier, monospace;
+  font-size: 0.9em;
+  background: #0b1220;
+  color: #d1e4ff;
+  border: 1px solid #2d3748;
+  border-radius: 4px;
+  padding: 1px 5px;
+}
+
+.markdown-body pre {
+  border: 1px solid #2d3748;
+  border-radius: 8px;
+  overflow-x: auto;
+  background: #0d1117;
+}
+
+.markdown-body pre code {
+  display: block;
+  border: 0;
+  border-radius: 0;
+  padding: 12px;
+  background: transparent;
 }
 .assistant-error {
   color: var(--error-color);

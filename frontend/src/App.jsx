@@ -120,13 +120,35 @@ function App() {
   const extractTextFromPayload = (payload) => {
     if (typeof payload === 'string') return payload;
     if (!payload || typeof payload !== 'object') return '';
-    return payload.review || payload.message || payload.result || payload.output || '';
+    return (
+      payload.review ||
+      payload.explanation ||
+      payload.message ||
+      payload.result ||
+      payload.output ||
+      ''
+    );
+  };
+
+  const extractCodeFromMarkdownFence = (text) => {
+    if (!text) return '';
+    const fencedMatch = text.match(/```[a-zA-Z0-9_-]*\n([\s\S]*?)```/);
+    return fencedMatch ? fencedMatch[1].trimEnd() : text;
   };
 
   const extractCodeFromPayload = (payload) => {
     if (typeof payload === 'string') return payload;
     if (!payload || typeof payload !== 'object') return '';
-    return payload.code || payload.rewrite || payload.optimized || payload.result || payload.output || '';
+    const rawCode =
+      payload.rewritten_code ||
+      payload.optimized_code ||
+      payload.code ||
+      payload.rewrite ||
+      payload.optimized ||
+      payload.result ||
+      payload.output ||
+      '';
+    return extractCodeFromMarkdownFence(rawCode);
   };
 
   const parseReviewTextToDockData = (reviewText) => {
@@ -147,7 +169,7 @@ function App() {
 
       const lineMatch = line.match(/line\s*(\d+)/i);
       const lineNumber = lineMatch ? Number.parseInt(lineMatch[1], 10) : index + 1;
-      const message = line.replace(/^[\-\*\d\.\)\s]+/, '');
+      const message = line.replace(/^[-*\d.)\s]+/, '');
 
       issues.push({
         severity,

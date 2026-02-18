@@ -1,12 +1,13 @@
 import React, { forwardRef } from 'react';
+import MarkdownRenderer from './MarkdownRenderer';
 
 const AssistantPanel = forwardRef(({ assistantMessage, isLoading }, ref) => {
   return (
     <div className="assistant-panel" ref={ref}>
-      <div className="assistant-header">RefactorX – AI Assistant</div>
+      <div className="assistant-header">RefactorX - AI Assistant</div>
       <div className="assistant-content">
         <div className={`assistant-message assistant-${assistantMessage.type}`}>
-          {assistantMessage.content}
+          <MarkdownRenderer content={assistantMessage.content} />
         </div>
       </div>
       <div className="prompt-bar">
