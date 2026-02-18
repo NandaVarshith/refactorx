@@ -69,3 +69,102 @@ async def review_code(request: CodeRequest):
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/rewrite")
+async def rewrite_code(request: CodeRequest):
+    if not request.code.strip():
+        raise HTTPException(status_code=400, detail="Code cannot be empty")
+
+    prompt = f"""
+    You are an expert software engineer.
+
+    Rewrite the following {request.language} code:
+    - Improve readability
+    - Improve performance
+    - Follow best practices
+    - Add proper minimal comments
+    - Make it production-ready
+
+    Return only the improved code.
+
+    Code:
+    {request.code}
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+
+        rewritten = response.choices[0].message.content
+        return {"rewritten_code": rewritten}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/optimize")
+async def optimize_code(request: CodeRequest):
+    if not request.code.strip():
+        raise HTTPException(status_code=400, detail="Code cannot be empty")
+
+    prompt = f"""
+    Optimize the following {request.language} code.
+
+    - Improve time complexity
+    - Improve memory usage
+    - Remove redundant logic
+    - Keep functionality same
+
+    Return only optimized code.
+
+    Code:
+    {request.code}
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.2,
+            max_tokens=1200,
+        )
+
+        optimized = response.choices[0].message.content
+        return {"optimized_code": optimized}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.post("/explain")
+async def explain_code(request: CodeRequest):
+    if not request.code.strip():
+        raise HTTPException(status_code=400, detail="Code cannot be empty")
+
+    prompt = f"""
+    Explain the following {request.language} code clearly.
+
+    - What it does
+    - How it works
+    - Important logic
+    - Time complexity if applicable
+
+    Code:
+    {request.code}
+    """
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.3,
+            max_tokens=1000,
+        )
+
+        explanation = response.choices[0].message.content
+        return {"explanation": explanation}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

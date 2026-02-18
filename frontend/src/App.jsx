@@ -6,7 +6,7 @@ import Editor from '../components/Editor';
 import ReviewDock from '../components/ReviewDock';
 
 // --- Constants ---
-const REVIEW_API_URL = 'http://127.0.0.1:8000/review';
+const API_BASE_URL = 'http://127.0.0.1:8000';
 const INITIAL_FILES = [
   {
     id: 'index-jsx',
@@ -117,21 +117,58 @@ function App() {
     }
   }, [isAddingFile]);
 
+  const extractTextFromPayload = (payload) => {
+    if (typeof payload === 'string') return payload;
+    if (!payload || typeof payload !== 'object') return '';
+    return payload.review || payload.message || payload.result || payload.output || '';
+  };
+
+  const extractCodeFromPayload = (payload) => {
+    if (typeof payload === 'string') return payload;
+    if (!payload || typeof payload !== 'object') return '';
+    return payload.code || payload.rewrite || payload.optimized || payload.result || payload.output || '';
+  };
+
+  const parseReviewTextToDockData = (reviewText) => {
+    const issues = [];
+    const lines = reviewText.split('\n').map((line) => line.trim()).filter(Boolean);
+
+    lines.forEach((line, index) => {
+      const severityMatch = line.match(/\b(critical|high|medium|low)\b/i);
+      if (!severityMatch) return;
+
+      const severityRaw = severityMatch[1].toLowerCase();
+      const severity =
+        severityRaw === 'medium'
+          ? 'medium'
+          : severityRaw === 'low'
+            ? 'suggestion'
+            : 'high';
+
+      const lineMatch = line.match(/line\s*(\d+)/i);
+      const lineNumber = lineMatch ? Number.parseInt(lineMatch[1], 10) : index + 1;
+      const message = line.replace(/^[\-\*\d\.\)\s]+/, '');
+
+      issues.push({
+        severity,
+        line: Number.isFinite(lineNumber) ? lineNumber : index + 1,
+        message,
+      });
+    });
+
+    const score = Math.max(1, 10 - issues.length);
+    return { score, issues };
+  };
+
   // --- API Call Logic ---
   const performApiAction = async (actionName) => {
     if (isLoading) return;
 
     setIsLoading(true);
     setAssistantMessage({ content: 'Analyzing...', type: 'loading' });
-    if (actionName !== 'review') {
-      setReviewData(null);
-      setAssistantMessage({ content: `"${actionName}" is not wired to this backend yet.`, type: 'error' });
-      setIsLoading(false);
-      return;
-    }
 
     try {
-      const response = await fetch(REVIEW_API_URL, {
+      const response = await fetch(`${API_BASE_URL}/${actionName}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, language: activeFile.language }),
@@ -144,10 +181,25 @@ function App() {
 
       const data = await response.json();
 
-      setReviewData(null);
-      setAssistantMessage({ content: data.review || 'Review complete.', type: 'message' });
+      if (actionName === 'review') {
+        const reviewText = extractTextFromPayload(data) || 'Review complete.';
+        setReviewData(parseReviewTextToDockData(reviewText));
+        setAssistantMessage({ content: reviewText, type: 'message' });
+      } else if (actionName === 'rewrite' || actionName === 'optimize') {
+        const nextCode = extractCodeFromPayload(data);
+        if (nextCode) {
+          setFileContents((prev) => ({ ...prev, [activeFile.id]: nextCode }));
+          setAssistantMessage({ content: `Code ${actionName} complete.`, type: 'message' });
+        } else {
+          setAssistantMessage({ content: extractTextFromPayload(data) || `${actionName} complete.`, type: 'message' });
+        }
+      } else if (actionName === 'explain') {
+        setAssistantMessage({ content: extractTextFromPayload(data) || 'Explanation complete.', type: 'message' });
+      } else {
+        setAssistantMessage({ content: extractTextFromPayload(data) || 'Request complete.', type: 'message' });
+      }
     } catch (error) {
-      console.error('API Error on /review:', error);
+      console.error(`API Error on /${actionName}:`, error);
       setAssistantMessage({ content: `Error: ${error.message}`, type: 'error' });
     } finally {
       setIsLoading(false);

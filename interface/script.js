@@ -1,6 +1,6 @@
 document.addEventListener('DOMContentLoaded', () => {
   // --- Configuration ---
-  const REVIEW_API_URL = 'http://127.0.0.1:8000/review';
+  const API_BASE_URL = 'http://127.0.0.1:8000';
 
   // --- DOM Elements ---
   const splitter = document.querySelector('.splitter');
@@ -148,20 +148,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // --- API Call Logic ---
 
+  function extractTextFromPayload(payload) {
+    if (typeof payload === 'string') return payload;
+    if (!payload || typeof payload !== 'object') return '';
+    return payload.review || payload.message || payload.result || payload.output || '';
+  }
+
+  function extractCodeFromPayload(payload) {
+    if (typeof payload === 'string') return payload;
+    if (!payload || typeof payload !== 'object') return '';
+    return payload.code || payload.rewrite || payload.optimized || payload.result || payload.output || '';
+  }
+
   async function performApiAction(endpoint, code, triggerBtn) {
     if (isLoading) return;
     setButtonsLoading(true, triggerBtn);
     displayInAssistant('Analyzing...', 'loading');
     clearReviewUI();
 
-    if (endpoint !== 'review') {
-      displayInAssistant(`"${endpoint}" is not wired to this backend yet.`, 'error');
-      setButtonsLoading(false, triggerBtn);
-      return null;
-    }
-
     try {
-      const response = await fetch(REVIEW_API_URL, {
+      const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ code, language: 'Java' }),
@@ -199,8 +205,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const code = getCode();
     const data = await performApiAction('review', code, reviewBtn);
     if (data) {
-      displayInAssistant(data.review || 'Review complete.');
-      clearReviewUI();
+      displayInAssistant(extractTextFromPayload(data) || 'Review complete.');
     }
   });
 
@@ -208,8 +213,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const code = getCode();
     const data = await performApiAction('rewrite', code, rewriteBtn);
     if (data) {
-      updateCodeDisplay(data);
-      displayInAssistant('Code has been rewritten.');
+      const updatedCode = extractCodeFromPayload(data);
+      if (updatedCode) updateCodeDisplay(updatedCode);
+      displayInAssistant(extractTextFromPayload(data) || 'Code has been rewritten.');
     }
   });
 
@@ -217,7 +223,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const code = getCode();
     const data = await performApiAction('explain', code, explainBtn);
     if (data) {
-      displayInAssistant(data);
+      displayInAssistant(extractTextFromPayload(data) || 'Explanation complete.');
     }
   });
 
@@ -225,8 +231,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const code = getCode();
     const data = await performApiAction('optimize', code, optimizeBtn);
     if (data) {
-      updateCodeDisplay(data);
-      displayInAssistant('Code has been optimized.');
+      const updatedCode = extractCodeFromPayload(data);
+      if (updatedCode) updateCodeDisplay(updatedCode);
+      displayInAssistant(extractTextFromPayload(data) || 'Code has been optimized.');
     }
   });
 
