@@ -322,15 +322,45 @@ body {
   padding-right: 8px;
 }
 
-.editor-input {
+.editor-code-wrapper {
+  position: relative;
   flex-grow: 1;
+  height: 100%;
+  overflow: hidden;
+}
+
+.editor-highlight {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  background-color: var(--bg-color);
+  color: var(--text-color);
+  font: inherit;
+  line-height: 1.5;
+  padding: 8px 12px;
+  white-space: pre;
+  overflow: auto;
+  pointer-events: none;
+  tab-size: 2;
+}
+
+.editor-highlight code {
+  display: block;
+  min-height: 100%;
+  font: inherit;
+}
+
+.editor-input {
+  position: absolute;
+  inset: 0;
   height: 100%;
   border: none;
   outline: none;
   resize: none;
   margin: 0;
-  background-color: var(--bg-color);
-  color: var(--text-color);
+  background: transparent;
+  color: transparent;
+  caret-color: var(--text-color);
   font: inherit;
   line-height: 1.5;
   padding: 8px 12px;
@@ -339,8 +369,55 @@ body {
   overflow: auto;
 }
 
+.editor-input::selection {
+  background: rgba(45, 212, 191, 0.25);
+}
+
 .editor-input:disabled {
   opacity: 0.75;
+}
+
+/* Editor syntax colors (Highlight.js token classes) */
+.editor-highlight .hljs-comment,
+.editor-highlight .hljs-quote {
+  color: #6b7280;
+}
+
+.editor-highlight .hljs-keyword,
+.editor-highlight .hljs-selector-tag,
+.editor-highlight .hljs-literal,
+.editor-highlight .hljs-section,
+.editor-highlight .hljs-link {
+  color: #f472b6;
+}
+
+.editor-highlight .hljs-string,
+.editor-highlight .hljs-title,
+.editor-highlight .hljs-name,
+.editor-highlight .hljs-type,
+.editor-highlight .hljs-attribute {
+  color: #86efac;
+}
+
+.editor-highlight .hljs-number,
+.editor-highlight .hljs-symbol,
+.editor-highlight .hljs-bullet,
+.editor-highlight .hljs-variable,
+.editor-highlight .hljs-template-variable,
+.editor-highlight .hljs-regexp {
+  color: #f59e0b;
+}
+
+.editor-highlight .hljs-function .hljs-title,
+.editor-highlight .hljs-title.function_ {
+  color: #60a5fa;
+}
+
+.editor-highlight .hljs-params,
+.editor-highlight .hljs-built_in,
+.editor-highlight .hljs-selector-class,
+.editor-highlight .hljs-selector-id {
+  color: #22d3ee;
 }
 
 /* --- Review Dock --- */
@@ -364,6 +441,13 @@ body {
 
 .review-summary {
   gap: 20px;
+}
+
+.review-structured-summary {
+  padding: 8px 15px;
+  border-bottom: 1px solid var(--divider-color);
+  color: var(--text-color-secondary);
+  font-size: 12px;
 }
 
 .review-content {
@@ -394,6 +478,48 @@ body {
   gap: 6px;
 }
 
+.severity-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.issue-message {
+  color: var(--text-color);
+}
+
+.issue-fix-hint {
+  color: var(--text-color-secondary);
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+.resolve-issue-btn {
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  background-color: var(--header-bg);
+  color: var(--text-color);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.resolve-issue-btn:hover {
+  border-color: var(--accent-color);
+  color: white;
+  background-color: var(--accent-hover-color);
+}
+
+.resolve-issue-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 /* --- Icon Styles --- */
 .icon {
   display: inline-block;
@@ -405,6 +531,7 @@ body {
 .icon-high { color: var(--error-color); }
 .icon-medium { color: var(--warning-color); }
 .icon-suggestion { color: var(--info-color); }
+.icon-check { color: var(--accent-color); }
 
 .action-btn .icon {
   width: 14px;

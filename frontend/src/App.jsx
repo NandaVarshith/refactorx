@@ -57,6 +57,7 @@ function App() {
   const [focusLine, setFocusLine] = useState(null);
   const [isAddingFile, setIsAddingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
+  const [fixingIssueId, setFixingIssueId] = useState(null);
 
   const activeFile = files.find((file) => file.id === activeFileId) || files[0];
   const code = fileContents[activeFile.id] ?? '';
@@ -151,35 +152,56 @@ function App() {
     return extractCodeFromMarkdownFence(rawCode);
   };
 
-  const parseReviewTextToDockData = (reviewText) => {
-    const issues = [];
-    const lines = reviewText.split('\n').map((line) => line.trim()).filter(Boolean);
+  const normalizeStructuredReview = (payload) => {
+    if (!payload || typeof payload !== 'object') {
+      return { score: 10, summary: 'No actionable issues found.', issues: [] };
+    }
 
-    lines.forEach((line, index) => {
-      const severityMatch = line.match(/\b(critical|high|medium|low)\b/i);
-      if (!severityMatch) return;
+    const rawIssues = Array.isArray(payload.issues) ? payload.issues : [];
+    const normalizedIssues = rawIssues
+      .map((issue, index) => {
+        if (!issue || typeof issue !== 'object') return null;
+        const line = Number.parseInt(issue.line, 10);
+        const severityRaw = String(issue.severity || '').toLowerCase();
+        const severity =
+          severityRaw === 'high' || severityRaw === 'critical'
+            ? 'high'
+            : severityRaw === 'medium'
+              ? 'medium'
+              : 'suggestion';
+        const message = String(issue.message || '').trim();
+        if (!message) return null;
 
-      const severityRaw = severityMatch[1].toLowerCase();
-      const severity =
-        severityRaw === 'medium'
-          ? 'medium'
-          : severityRaw === 'low'
-            ? 'suggestion'
-            : 'high';
+        return {
+          id: String(issue.id || `issue-${index + 1}-${Number.isFinite(line) ? line : 1}`),
+          severity,
+          line: Number.isFinite(line) && line > 0 ? line : 1,
+          message,
+          fix: String(issue.fix || '').trim() || 'Apply a minimal targeted fix.',
+        };
+      })
+      .filter(Boolean);
 
-      const lineMatch = line.match(/line\s*(\d+)/i);
-      const lineNumber = lineMatch ? Number.parseInt(lineMatch[1], 10) : index + 1;
-      const message = line.replace(/^[-*\d.)\s]+/, '');
+    const scoreValue = Number.parseInt(payload.score, 10);
+    const score = Number.isFinite(scoreValue) ? Math.max(1, Math.min(scoreValue, 10)) : Math.max(1, 10 - normalizedIssues.length);
+    const summary = String(payload.summary || '').trim() || (normalizedIssues.length ? `${normalizedIssues.length} actionable issue(s) found.` : 'No actionable issues found.');
 
-      issues.push({
-        severity,
-        line: Number.isFinite(lineNumber) ? lineNumber : index + 1,
-        message,
-      });
+    return { score, summary, issues: normalizedIssues };
+  };
+
+  const apiPost = async (endpoint, payload) => {
+    const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
     });
 
-    const score = Math.max(1, 10 - issues.length);
-    return { score, issues };
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.detail || errorData.error?.message || `HTTP error! Status: ${response.status}`);
+    }
+
+    return response.json();
   };
 
   // --- API Call Logic ---
@@ -190,34 +212,31 @@ function App() {
     setAssistantMessage({ content: 'Analyzing...', type: 'loading' });
 
     try {
-      const response = await fetch(`${API_BASE_URL}/${actionName}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, language: activeFile.language }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.detail || errorData.error?.message || `HTTP error! Status: ${response.status}`);
-      }
-
-      const data = await response.json();
-
       if (actionName === 'review') {
-        const reviewText = extractTextFromPayload(data) || 'Review complete.';
-        setReviewData(parseReviewTextToDockData(reviewText));
+        const [reviewTextData, structuredReviewData] = await Promise.all([
+          apiPost('review', { code, language: activeFile.language }),
+          apiPost('review-structured', { code, language: activeFile.language }),
+        ]);
+
+        const reviewText = extractTextFromPayload(reviewTextData) || 'Review complete.';
+        const normalizedReview = normalizeStructuredReview(structuredReviewData);
+        setReviewData(normalizedReview);
         setAssistantMessage({ content: reviewText, type: 'message' });
       } else if (actionName === 'rewrite' || actionName === 'optimize') {
+        const data = await apiPost(actionName, { code, language: activeFile.language });
         const nextCode = extractCodeFromPayload(data);
         if (nextCode) {
           setFileContents((prev) => ({ ...prev, [activeFile.id]: nextCode }));
+          setReviewData(null);
           setAssistantMessage({ content: `Code ${actionName} complete.`, type: 'message' });
         } else {
           setAssistantMessage({ content: extractTextFromPayload(data) || `${actionName} complete.`, type: 'message' });
         }
       } else if (actionName === 'explain') {
+        const data = await apiPost(actionName, { code, language: activeFile.language });
         setAssistantMessage({ content: extractTextFromPayload(data) || 'Explanation complete.', type: 'message' });
       } else {
+        const data = await apiPost(actionName, { code, language: activeFile.language });
         setAssistantMessage({ content: extractTextFromPayload(data) || 'Request complete.', type: 'message' });
       }
     } catch (error) {
@@ -238,11 +257,51 @@ function App() {
 
   const handleEditorChange = (nextCode) => {
     setFileContents((prev) => ({ ...prev, [activeFile.id]: nextCode }));
+    setReviewData(null);
   };
 
   const handleCardClick = (lineNumber) => {
     setFocusLine(lineNumber);
     setCursorPos({ line: lineNumber, col: 1 });
+  };
+
+  const handleResolveIssue = async (issue) => {
+    if (isLoading) return;
+
+    setIsLoading(true);
+    setFixingIssueId(issue.id);
+    setAssistantMessage({ content: `Fixing issue on line ${issue.line}...`, type: 'loading' });
+
+    try {
+      const fixResult = await apiPost('fix-issue', {
+        code,
+        language: activeFile.language,
+        issue,
+      });
+      const fixedCode = extractCodeFromPayload({ code: fixResult.fixed_code });
+      if (!fixedCode) {
+        throw new Error('Fix API returned empty code.');
+      }
+
+      setFileContents((prev) => ({ ...prev, [activeFile.id]: fixedCode }));
+      const updatedStructuredReview = await apiPost('review-structured', {
+        code: fixedCode,
+        language: activeFile.language,
+      });
+      setReviewData(normalizeStructuredReview(updatedStructuredReview));
+      setAssistantMessage({
+        content: fixResult.change_summary || `Issue on line ${issue.line} fixed.`,
+        type: 'message',
+      });
+      setFocusLine(issue.line);
+      setCursorPos({ line: issue.line, col: 1 });
+    } catch (error) {
+      console.error('API Error on /fix-issue:', error);
+      setAssistantMessage({ content: `Error: ${error.message}`, type: 'error' });
+    } finally {
+      setFixingIssueId(null);
+      setIsLoading(false);
+    }
   };
 
   const createNewFile = (fileName) => {
@@ -336,6 +395,7 @@ function App() {
                   setCopyButtonText('Copy');
                   setCursorPos({ line: 1, col: 1 });
                   setFocusLine(null);
+                  setReviewData(null);
                 }}
               >
                 <span className="tab-label">{file.name}</span>
@@ -391,6 +451,7 @@ function App() {
 
         <Editor
           code={code}
+          language={activeFile.language}
           onChange={handleEditorChange}
           onCursorChange={setCursorPos}
           focusLine={focusLine}
@@ -401,6 +462,8 @@ function App() {
         <ReviewDock
           reviewData={reviewData}
           onCardClick={handleCardClick}
+          onResolveIssue={handleResolveIssue}
+          fixingIssueId={fixingIssueId}
         />
 
         <div className="status-bar">
