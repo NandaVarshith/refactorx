@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+﻿import React, { useState, useEffect, useRef } from 'react';
 import './App.css'
 import AssistantPanel from '../components/AssistantPanel';
 import ActionButtons from '../components/ActionButtons';
@@ -35,7 +35,57 @@ const inferLanguage = (fileName) => {
   return 'Text';
 };
 
-function App() {
+function LandingPage({ onStart }) {
+  return (
+    <div className="landing-shell" onClick={onStart}>
+      <div className="landing-bg-orb landing-bg-orb-one" aria-hidden="true" />
+      <div className="landing-bg-orb landing-bg-orb-two" aria-hidden="true" />
+
+      <header className="landing-header">
+        <div className="landing-brand">RefactorX</div>
+        <button type="button" className="landing-link-btn" onClick={onStart}>
+          Open Workspace
+        </button>
+      </header>
+
+      <main className="landing-main">
+        <section className="landing-hero">
+          <p className="landing-kicker">AI Code Review + Refactor Assistant</p>
+          <h1>Ship cleaner code in minutes, not hours.</h1>
+          <p className="landing-subtitle">
+            Review, optimize, explain, and fix code issues with one workspace built for practical engineering work.
+          </p>
+
+          <div className="landing-actions">
+            <button type="button" className="landing-primary-btn" onClick={onStart}>
+              Start Workspace
+            </button>
+            <button type="button" className="landing-secondary-btn" onClick={onStart}>
+              Try Demo Flow
+            </button>
+          </div>
+        </section>
+
+        <section className="landing-grid" aria-label="Key features">
+          <article className="landing-card">
+            <h3>Structured Reviews</h3>
+            <p>Get actionable issue cards with severity, line targeting, and quick fix hints.</p>
+          </article>
+          <article className="landing-card">
+            <h3>One-Click Fixes</h3>
+            <p>Resolve detected issues and immediately validate with follow-up analysis.</p>
+          </article>
+          <article className="landing-card">
+            <h3>Prompt-Driven Editing</h3>
+            <p>Ask focused questions and iterate with contextual memory inside your session.</p>
+          </article>
+        </section>
+      </main>
+    </div>
+  );
+}
+
+function WorkspaceApp({ onBackToLanding }) {
   // --- State Management ---
   const [files, setFiles] = useState(INITIAL_FILES);
   const [fileContents, setFileContents] = useState(() => {
@@ -527,7 +577,11 @@ function App() {
               />
             )}
           </div>
-          <button className="copy-btn" onClick={handleCopy} disabled={isLoading}>{copyButtonText}</button>
+
+          <div className="tabs-right">
+            <button className="ghost-btn" onClick={onBackToLanding} disabled={isLoading}>Landing</button>
+            <button className="copy-btn" onClick={handleCopy} disabled={isLoading}>{copyButtonText}</button>
+          </div>
         </div>
 
         <ActionButtons onApiAction={performApiAction} isLoading={isLoading} />
@@ -558,4 +612,23 @@ function App() {
   )
 }
 
+function App() {
+  const [isWorkspaceOpen, setIsWorkspaceOpen] = useState(false);
+
+  const openWorkspace = () => {
+    setIsWorkspaceOpen(true);
+  };
+
+  const backToLanding = () => {
+    setIsWorkspaceOpen(false);
+  };
+
+  if (!isWorkspaceOpen) {
+    return <LandingPage onStart={openWorkspace} />;
+  }
+
+  return <WorkspaceApp onBackToLanding={backToLanding} />;
+}
+
 export default App;
+
