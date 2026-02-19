@@ -1,5 +1,6 @@
 import json
 import os
+import re
 from typing import Optional
 
 from dotenv import load_dotenv
@@ -89,6 +90,10 @@ def _extract_code_from_text(raw_text: str) -> str:
         return ""
 
     stripped = raw_text.strip()
+    fence_match = re.search(r"```[a-zA-Z0-9_-]*\n([\s\S]*?)```", stripped)
+    if fence_match:
+        return fence_match.group(1).strip("\n")
+
     if stripped.startswith("```"):
         first_newline = stripped.find("\n")
         last_fence = stripped.rfind("```")
@@ -319,6 +324,8 @@ You are an expert software engineer.
 Fix only the issue below in the given {request.language} code.
 Keep behavior unchanged except for that fix.
 Keep edits minimal and avoid unrelated changes.
+Prioritize changing only the reported line and the smallest nearby context required.
+Do not refactor unrelated code.
 
 Issue:
 - Severity: {request.issue.severity}
@@ -326,11 +333,9 @@ Issue:
 - Problem: {request.issue.message}
 - Suggested fix: {request.issue.fix}
 
-Return JSON only:
-{{
-  "fixed_code": "full updated code",
-  "change_summary": "short summary"
-}}
+Return only the full updated code in a single fenced code block.
+Do not return JSON.
+Do not add explanations.
 
 Code:
 {request.code}
@@ -341,23 +346,11 @@ Code:
             model="llama-3.3-70b-versatile",
             messages=[{"role": "user", "content": prompt}],
             temperature=0.1,
-            max_tokens=1800,
+            max_tokens=3000,
         )
         raw_output = response.choices[0].message.content
-        parsed = _extract_json(raw_output)
-
-        fixed_code = ""
-        change_summary = "Issue fixed."
-        if isinstance(parsed, dict):
-            fixed_code = str(parsed.get("fixed_code", "")).strip()
-            parsed_summary = str(parsed.get("change_summary", "")).strip()
-            if parsed_summary:
-                change_summary = parsed_summary
-
-        if not fixed_code:
-            fixed_code = _extract_code_from_text(raw_output)
-            if fixed_code.startswith("{") and fixed_code.endswith("}"):
-                fixed_code = ""
+        fixed_code = _extract_code_from_text(raw_output)
+        change_summary = f"Applied fix for issue on line {request.issue.line}."
 
         if not fixed_code:
             raise HTTPException(status_code=502, detail="Failed to generate valid fixed code.")

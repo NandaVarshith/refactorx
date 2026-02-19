@@ -189,6 +189,27 @@ function App() {
     return { score, summary, issues: normalizedIssues };
   };
 
+  const normalizeIssueMessage = (message) =>
+    String(message || '')
+      .toLowerCase()
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const isSameIssue = (targetIssue, candidateIssue) => {
+    if (!targetIssue || !candidateIssue) return false;
+    const sameLine = Math.abs(Number(candidateIssue.line) - Number(targetIssue.line)) <= 1;
+    if (!sameLine) return false;
+
+    const targetMessage = normalizeIssueMessage(targetIssue.message);
+    const candidateMessage = normalizeIssueMessage(candidateIssue.message);
+    if (!targetMessage || !candidateMessage) return false;
+
+    return (
+      candidateMessage.includes(targetMessage) ||
+      targetMessage.includes(candidateMessage)
+    );
+  };
+
   const apiPost = async (endpoint, payload) => {
     const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
       method: 'POST',
@@ -288,7 +309,15 @@ function App() {
         code: fixedCode,
         language: activeFile.language,
       });
-      setReviewData(normalizeStructuredReview(updatedStructuredReview));
+      const normalizedReview = normalizeStructuredReview(updatedStructuredReview);
+      const targetIssueStillPresent = normalizedReview.issues.some((nextIssue) =>
+        isSameIssue(issue, nextIssue)
+      );
+      if (targetIssueStillPresent) {
+        throw new Error('Selected issue is still present after fix. Try fixing it again.');
+      }
+
+      setReviewData(normalizedReview);
       setAssistantMessage({
         content: fixResult.change_summary || `Issue on line ${issue.line} fixed.`,
         type: 'message',
