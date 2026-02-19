@@ -425,7 +425,7 @@ async def promptbar_continue(request: PromptBarRequest):
         "role": "system",
         "content": (
             "You are RefactorX, a code assistant. Continue the ongoing conversation naturally. "
-            "Use the provided code as the latest source of truth and keep answers concise and actionable."
+            "Use the provided code as the latest source of truth and keep answers concise and actionable in a structured format."
         ),
     }
     user_context = {
