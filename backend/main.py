@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from groq import Groq
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 # Load environment variables
 load_dotenv()
@@ -56,6 +56,18 @@ class FixIssueRequest(BaseModel):
 class FixIssueResponse(BaseModel):
     fixed_code: str
     change_summary: str
+
+
+class ChatMessage(BaseModel):
+    role: str
+    content: str
+
+
+class PromptBarRequest(BaseModel):
+    code: str
+    language: str
+    prompt: str
+    history: list[ChatMessage] = Field(default_factory=list)
 
 
 def _extract_json(raw_text: str) -> Optional[dict]:
@@ -388,5 +400,53 @@ async def explain_code(request: CodeRequest):
         )
         explanation = response.choices[0].message.content
         return {"explanation": explanation}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/promptbar")
+async def promptbar_continue(request: PromptBarRequest):
+    if not request.code.strip():
+        raise HTTPException(status_code=400, detail="Code cannot be empty")
+    if not request.prompt.strip():
+        raise HTTPException(status_code=400, detail="Prompt cannot be empty")
+
+    safe_history = []
+    for message in request.history[-12:]:
+        role = (message.role or "").strip().lower()
+        if role not in {"user", "assistant"}:
+            continue
+        content = (message.content or "").strip()
+        if not content:
+            continue
+        safe_history.append({"role": role, "content": content})
+
+    system_message = {
+        "role": "system",
+        "content": (
+            "You are RefactorX, a code assistant. Continue the ongoing conversation naturally. "
+            "Use the provided code as the latest source of truth and keep answers concise and actionable."
+        ),
+    }
+    user_context = {
+        "role": "user",
+        "content": (
+            f"Current language: {request.language}\n\n"
+            f"Current code:\n{request.code}\n\n"
+            f"Follow-up request: {request.prompt}"
+        ),
+    }
+
+    messages = [system_message, *safe_history, user_context]
+
+    try:
+        response = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=messages,
+            temperature=0.2,
+            max_tokens=1200,
+        )
+        reply = response.choices[0].message.content
+        return {"message": reply}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

@@ -58,6 +58,8 @@ function App() {
   const [isAddingFile, setIsAddingFile] = useState(false);
   const [newFileName, setNewFileName] = useState('');
   const [fixingIssueId, setFixingIssueId] = useState(null);
+  const [promptInput, setPromptInput] = useState('');
+  const [chatHistory, setChatHistory] = useState([]);
 
   const activeFile = files.find((file) => file.id === activeFileId) || files[0];
   const code = fileContents[activeFile.id] ?? '';
@@ -210,6 +212,15 @@ function App() {
     );
   };
 
+  const appendChatHistory = (role, content) => {
+    const normalizedRole = String(role || '').trim().toLowerCase();
+    const normalizedContent = String(content || '').trim();
+    if (!normalizedContent) return;
+    if (normalizedRole !== 'user' && normalizedRole !== 'assistant') return;
+
+    setChatHistory((prev) => [...prev, { role: normalizedRole, content: normalizedContent }].slice(-20));
+  };
+
   const apiPost = async (endpoint, payload) => {
     const response = await fetch(`${API_BASE_URL}/${endpoint}`, {
       method: 'POST',
@@ -231,6 +242,7 @@ function App() {
 
     setIsLoading(true);
     setAssistantMessage({ content: 'Analyzing...', type: 'loading' });
+    appendChatHistory('user', `${actionName} the current ${activeFile.language} code.`);
 
     try {
       if (actionName === 'review') {
@@ -243,22 +255,31 @@ function App() {
         const normalizedReview = normalizeStructuredReview(structuredReviewData);
         setReviewData(normalizedReview);
         setAssistantMessage({ content: reviewText, type: 'message' });
+        appendChatHistory('assistant', reviewText);
       } else if (actionName === 'rewrite' || actionName === 'optimize') {
         const data = await apiPost(actionName, { code, language: activeFile.language });
         const nextCode = extractCodeFromPayload(data);
         if (nextCode) {
           setFileContents((prev) => ({ ...prev, [activeFile.id]: nextCode }));
           setReviewData(null);
-          setAssistantMessage({ content: `Code ${actionName} complete.`, type: 'message' });
+          const resultMessage = `Code ${actionName} complete.`;
+          setAssistantMessage({ content: resultMessage, type: 'message' });
+          appendChatHistory('assistant', resultMessage);
         } else {
-          setAssistantMessage({ content: extractTextFromPayload(data) || `${actionName} complete.`, type: 'message' });
+          const resultMessage = extractTextFromPayload(data) || `${actionName} complete.`;
+          setAssistantMessage({ content: resultMessage, type: 'message' });
+          appendChatHistory('assistant', resultMessage);
         }
       } else if (actionName === 'explain') {
         const data = await apiPost(actionName, { code, language: activeFile.language });
-        setAssistantMessage({ content: extractTextFromPayload(data) || 'Explanation complete.', type: 'message' });
+        const resultMessage = extractTextFromPayload(data) || 'Explanation complete.';
+        setAssistantMessage({ content: resultMessage, type: 'message' });
+        appendChatHistory('assistant', resultMessage);
       } else {
         const data = await apiPost(actionName, { code, language: activeFile.language });
-        setAssistantMessage({ content: extractTextFromPayload(data) || 'Request complete.', type: 'message' });
+        const resultMessage = extractTextFromPayload(data) || 'Request complete.';
+        setAssistantMessage({ content: resultMessage, type: 'message' });
+        appendChatHistory('assistant', resultMessage);
       }
     } catch (error) {
       console.error(`API Error on /${actionName}:`, error);
@@ -284,6 +305,36 @@ function App() {
   const handleCardClick = (lineNumber) => {
     setFocusLine(lineNumber);
     setCursorPos({ line: lineNumber, col: 1 });
+  };
+
+  const handlePromptSubmit = async () => {
+    if (isLoading) return;
+
+    const userPrompt = promptInput.trim();
+    if (!userPrompt) return;
+
+    const nextHistory = [...chatHistory, { role: 'user', content: userPrompt }].slice(-20);
+    setPromptInput('');
+    setChatHistory(nextHistory);
+    setIsLoading(true);
+    setAssistantMessage({ content: 'Thinking...', type: 'loading' });
+
+    try {
+      const data = await apiPost('promptbar', {
+        code,
+        language: activeFile.language,
+        prompt: userPrompt,
+        history: nextHistory,
+      });
+      const reply = extractTextFromPayload(data) || 'Request complete.';
+      setAssistantMessage({ content: reply, type: 'message' });
+      appendChatHistory('assistant', reply);
+    } catch (error) {
+      console.error('API Error on /promptbar:', error);
+      setAssistantMessage({ content: `Error: ${error.message}`, type: 'error' });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleResolveIssue = async (issue) => {
@@ -406,6 +457,9 @@ function App() {
         ref={leftPanelRef}
         assistantMessage={assistantMessage}
         isLoading={isLoading}
+        promptValue={promptInput}
+        onPromptChange={setPromptInput}
+        onPromptSubmit={handlePromptSubmit}
       />
 
       <div className="splitter" ref={splitterRef}></div>
